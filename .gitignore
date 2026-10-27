@@ -1,0 +1,15 @@
+# Build Android (TWA / Bubblewrap / Capacitor)
+android/build/
+*.apk
+*.aab
+*.idx
+.gradle/
+local.properties
+
+# Firma: nunca subir la keystore
+*.keystore
+*.jks
+
+node_modules/
+.DS_Store
+Thumbs.db
