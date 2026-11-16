@@ -13,12 +13,25 @@ App web progresiva (PWA) para seguir un plan semanal de entrenamiento con tres b
 - **Días no cumplidos**: un día (hoy o pasado) se puede marcar como *no cumplido*, con un motivo opcional (lluvia, trabajo…), y pasar sus bloques a otro día de lo que queda de la semana. Se puede deshacer.
 - **Alertas**: sonido, vibración (Android) y pantalla siempre encendida mientras corre un temporizador.
 - **Ajustes**: plan semanal por día, alertas, exportar/importar los datos en JSON y borrar registros.
+- **Comidas** (menú del día):
+  - **Objetivo diario**: tope de calorías, proteína mínima y reparto en % entre desayuno, almuerzo, merienda y cena.
+  - **Totales del día** contra el objetivo: calorías, proteínas, carbohidratos y grasas.
+  - **Armar el día**: arma las cuatro comidas con lo disponible en la despensa, sin pasarse del tope y priorizando la proteína (proteína + carbohidrato + verdura y grasa en almuerzo/cena; proteína o lácteo + carbohidrato + fruta en desayuno/merienda). Lo que sobra o falta en una comida se compensa en las siguientes.
+  - Por comida: **Otra opción**, agregar productos a mano, ajustar cantidades y **fijar** la comida para que el armador no la toque (se fija sola al editarla).
+- **Despensa** (pestaña aparte):
+  - Al escribir el nombre sugiere alimentos de una **base de referencia** (`alimentos.js`, ~90 alimentos) y completa macros, porción y comidas. Conviene revisar los valores con el envase.
+  - **Cantidad que tenés**: "1 kg", "500 g", "1,5 l"… (también se puede escribir en el nombre: "pechuga de pollo 1kg"). Muestra la proteína y calorías totales de lo que tenés, cuánto usa el menú de la semana, y el armador no propone más de eso.
+  - Tabla nutricional cada 100 g o ml (las calorías se calculan solas si no se ponen), tipo de alimento, porción habitual, comidas en que se usa y tilde de *disponible*.
 
 ## Estructura
 
 | Archivo | Para qué sirve |
 | --- | --- |
-| `index.html` | Toda la app: HTML, CSS y JavaScript sin dependencias ni build. |
+| `index.html` | La app y el módulo de entrenamiento: HTML, CSS y JavaScript sin dependencias ni build. |
+| `alimentos.js` | Base de alimentos de referencia para autocompletar la despensa. |
+| `despensa.js` | Pestaña Despensa: productos, cantidades y autocompletado. |
+| `menu.js` | Pestaña Comidas: menú del día, totales y armador automático. |
+| `comidas.css` | Estilos de Comidas y Despensa. |
 | `sw.js` | Service worker: cachea la app para usarla offline (stale-while-revalidate). |
 | `manifest.webmanifest` | Nombre, colores e íconos para instalarla como app. |
 | `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` | Íconos. |

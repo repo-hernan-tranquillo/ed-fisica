@@ -11,6 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="comidas.css">
 <title>Entreno Semanal</title>
 <style>
 :root{
@@ -198,6 +199,12 @@ textarea:focus{outline:none;border-color:var(--c-fuerza)}
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:30}
 .sheet{position:fixed;left:0;right:0;bottom:0;max-height:88dvh;overflow:auto;background:var(--s1);border-radius:24px 24px 0 0;padding:10px 16px calc(env(safe-area-inset-bottom) + 20px);z-index:31;max-width:560px;margin:0 auto;animation:up .25s ease-out}
 @keyframes up{from{transform:translateY(100%)}}
+.sheet.noanim{animation:none}
+
+/* Selector Entreno / Comidas */
+.switch{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:5px;margin-bottom:14px}
+.switch button{min-height:42px;border-radius:12px;font-weight:700;font-size:14px;color:var(--mu);display:flex;align-items:center;justify-content:center;gap:6px}
+.switch button.on{background:var(--s3);color:var(--tx)}
 .grab{width:44px;height:5px;border-radius:5px;background:var(--s3);margin:0 auto 12px}
 .sheet h3{margin:20px 0 8px;font-size:14px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em}
 .prow{display:grid;grid-template-columns:44px 1fr;align-items:center;gap:8px;padding:6px 0}
@@ -271,7 +278,8 @@ const P = {
   timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/>',
   moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   rain:'<path d="M7 15a4.5 4.5 0 1 1 1-8.9A5.5 5.5 0 0 1 18.5 8 3.5 3.5 0 0 1 17 15z"/><path d="M8 18.5l-1 2M12 18.5l-1 2M16 18.5l-1 2"/>',
-  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>'
+  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  food:'<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1.5-3 4-3 7v4h3"/>'
 };
 const ic = (n, s = 22, w = 2.2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
@@ -280,12 +288,16 @@ const KEY = 'entreno-lumbar-v1';
 const defaults = () => ({
   plan: [['fuerza'], ['cardio','lumbar'], ['fuerza'], ['cardio','lumbar'], ['fuerza'], ['cardio','lumbar'], []],
   logs: {},
-  cfg: { rounds:4, work:40, rest:20, amrapMin:15, plank:30, sound:true, vibe:true }
+  cfg: { rounds:4, work:40, rest:20, amrapMin:15, plank:30, sound:true, vibe:true },
+  foods: [],
+  nut: { kcal:3000, prot:0, split:[25, 35, 15, 25] },
+  menus: {}
 });
+const withDefaults = d => ({ ...defaults(), ...d, cfg: { ...defaults().cfg, ...d.cfg }, nut: { ...defaults().nut, ...d.nut } });
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY));
-    if (d && Array.isArray(d.plan)) return { ...defaults(), ...d, cfg: { ...defaults().cfg, ...d.cfg } };
+    if (d && Array.isArray(d.plan)) return withDefaults(d);
   } catch (e) {}
   return defaults();
 }
@@ -348,11 +360,22 @@ function moveTargets(k) {
 let view = 'home', weekOff = 0, sel = todayKey(), tab = null, sheetOpen = false;
 const app = document.getElementById('app');
 
+let lastSheet = '';
 function render() {
-  app.innerHTML = view === 'home' ? homeHTML() : workoutHTML();
-  document.getElementById('sheet').innerHTML = sheetOpen ? sheetHTML() : '';
+  app.innerHTML = view === 'home' ? homeHTML() : view === 'food' ? menuHTML() : view === 'pantry' ? pantryHTML() : workoutHTML();
+  const sh = sheetOpen ? sheetHTML() : view === 'food' ? pickSheetHTML() : view === 'pantry' ? foodSheetHTML() : '';
+  const kind = sheetOpen ? 'settings' : sh ? view : '';
+  document.getElementById('sheet').innerHTML = sh;
+  // La hoja solo se anima al abrirse, no en cada re-render
+  if (kind && kind === lastSheet) document.querySelector('#sheet .sheet').classList.add('noanim');
+  lastSheet = kind;
   if (view === 'workout' && tab === 'cardio') renderTimer();
 }
+
+const switchHTML = () => `<nav class="switch">
+  <button class="${view === 'home' ? 'on' : ''}" data-a="go" data-v="home">${ic('dumbbell', 18)} Entreno</button>
+  <button class="${view === 'food' ? 'on' : ''}" data-a="go" data-v="food">${ic('food', 18)} Comidas</button>
+  <button class="${view === 'pantry' ? 'on' : ''}" data-a="go" data-v="pantry">${ic('box', 18)} Despensa</button></nav>`;
 
 /* ---------- Dashboard ---------- */
 function homeHTML() {
@@ -387,7 +410,7 @@ function homeHTML() {
   const st = today === sel ? dayStatus(today) : null;
   const ctaLabel = st === 'done' ? 'Hoy: objetivo cumplido ✓' : st === 'missed' ? 'Registrar igual lo de hoy' : st === 'partial' ? 'Continuar entrenamiento de hoy' : 'Comenzar entrenamiento de hoy';
 
-  return `
+  return `${switchHTML()}
   <header class="top">
     <div><p class="eyebrow">${label}</p><h1 class="num">${s.getDate()} ${MONTHS[s.getMonth()]} – ${e.getDate()} ${MONTHS[e.getMonth()]}</h1></div>
     <button class="icon-btn" data-a="openSettings" aria-label="Ajustes">${ic('sliders')}</button>
@@ -834,7 +857,7 @@ const actions = {
   },
   import() { document.getElementById('imp').click(); },
   wipe() {
-    if (!confirm('¿Borrar todos los registros? El plan semanal se mantiene.')) return;
+    if (!confirm('¿Borrar todos los registros de entrenamiento? El plan semanal y la despensa se mantienen.')) return;
     db.logs = {}; save(); render(); toast('Registros borrados');
   }
 };
@@ -854,7 +877,7 @@ document.getElementById('imp').addEventListener('change', e => {
   f.text().then(t => {
     const d = JSON.parse(t);
     if (!Array.isArray(d.plan) || typeof d.logs !== 'object') throw 0;
-    db = { ...defaults(), ...d, cfg:{ ...defaults().cfg, ...d.cfg } };
+    db = withDefaults(d);
     save(); sheetOpen = false; render(); toast('Datos importados ✓');
   }).catch(() => toast('Archivo no válido'));
   e.target.value = '';
@@ -868,5 +891,8 @@ setInterval(() => { if (todayKey() !== lastToday) { lastToday = todayKey(); if (
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
+<script src="alimentos.js"></script>
+<script src="despensa.js"></script>
+<script src="menu.js"></script>
 </body>
 </html>
