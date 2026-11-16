@@ -1,6 +1,6 @@
 // Service worker: deja la app disponible sin conexión.
 // Estrategia stale-while-revalidate: responde desde caché y actualiza en segundo plano.
-const CACHE = 'entreno-v1';
+const CACHE = 'entreno-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

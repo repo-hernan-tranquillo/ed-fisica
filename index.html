@@ -15,7 +15,7 @@
 <style>
 :root{
   --bg:#0a0e13;--s1:#121922;--s2:#1a2330;--s3:#243041;--line:#253142;
-  --tx:#eef3f8;--mu:#8b98aa;--ok:#22c55e;--okd:rgba(34,197,94,.14);
+  --tx:#eef3f8;--mu:#8b98aa;--ok:#22c55e;--okd:rgba(34,197,94,.14);--bad:#f87171;--badd:rgba(248,113,113,.14);
   --c-fuerza:#60a5fa;--c-cardio:#fb923c;--c-lumbar:#a78bfa;
   --work:#fb923c;--rest:#38bdf8;--prep:#facc15;
   --r:20px;color-scheme:dark;
@@ -53,6 +53,7 @@ h3{font-size:17px;font-weight:700}
 .day.done .dd{background:var(--ok);color:#04220f}
 .day.partial .dd{background:var(--okd);color:var(--ok);box-shadow:inset 0 0 0 2px var(--ok)}
 .day.rest .dd{background:transparent;color:var(--mu)}
+.day.missed .dd{background:var(--badd);color:var(--bad);box-shadow:inset 0 0 0 2px var(--bad)}
 .day.today .dn{color:var(--tx)}
 .day.sel{border-color:var(--tx);background:var(--s2)}
 
@@ -71,6 +72,15 @@ h3{font-size:17px;font-weight:700}
 .pill{font-size:12px;font-weight:700;padding:5px 10px;border-radius:99px;background:var(--s3);color:var(--mu);white-space:nowrap}
 .pill.done{background:var(--ok);color:#04220f}
 .pill.partial{background:var(--okd);color:var(--ok)}
+.pill.missed{background:var(--badd);color:var(--bad)}
+.miss{margin-top:14px;padding:14px;border-radius:16px;background:var(--badd);border:1px solid rgba(248,113,113,.35)}
+.miss h3{color:var(--bad);font-size:15px;display:flex;align-items:center;gap:8px}
+.miss input{width:100%;min-height:46px;margin-top:8px;padding:0 14px;border-radius:14px;background:var(--s1);border:1.5px solid var(--line);font-size:16px}
+.miss input:focus{outline:none;border-color:var(--bad)}
+.miss .chip.on{color:var(--bad)}
+.miss .moved{margin-top:10px;font-size:14px;display:flex;align-items:center;gap:6px}
+.btn.sm.ghost-bad{color:var(--bad);border-color:rgba(248,113,113,.35)}
+.motto .warn{display:block;color:var(--bad);margin-top:4px}
 .blk{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
 .blk .bi{width:40px;height:40px;border-radius:12px;display:grid;place-items:center}
 .blk .bn{font-weight:650}
@@ -259,7 +269,9 @@ const P = {
   minus:'<path d="M5 12h14"/>',
   x:'<path d="M6 6l12 12M18 6L6 18"/>',
   timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/>',
-  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'
+  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  rain:'<path d="M7 15a4.5 4.5 0 1 1 1-8.9A5.5 5.5 0 0 1 18.5 8 3.5 3.5 0 0 1 17 15z"/><path d="M8 18.5l-1 2M12 18.5l-1 2M16 18.5l-1 2"/>',
+  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>'
 };
 const ic = (n, s = 22, w = 2.2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
@@ -317,10 +329,20 @@ function dayStatus(k) {
   if (!bs.length) return 'rest';
   const p = bs.map(b => blockProgress(b, db.logs[k]));
   if (p.every(x => x >= 1)) return 'done';
+  if (db.logs[k] && db.logs[k].missed) return 'missed';
   return p.some(x => x > 0) ? 'partial' : 'pending';
 }
 const dayPct = k => { const bs = blocksFor(k); return bs.length ? bs.reduce((a, b) => a + blockProgress(b, db.logs[k]), 0) / bs.length : 0; };
-const STATUS_LABEL = { done:'Cumplido', partial:'En curso', pending:'Pendiente', rest:'Descanso' };
+const STATUS_LABEL = { done:'Cumplido', partial:'En curso', pending:'Pendiente', rest:'Descanso', missed:'No cumplido' };
+const MISS_REASONS = ['Lluvia', 'Trabajo', 'Cansancio', 'Salud', 'Imprevisto'];
+const dayName = k => `${DAYS_LONG[wd(k)].toLowerCase()} ${parseKey(k).getDate()}`;
+// Días a los que se pueden pasar los bloques de un día no cumplido: lo que queda de esa misma semana, desde hoy.
+function moveTargets(k) {
+  const s = parseKey(k); s.setDate(s.getDate() - wd(k));
+  const wk = [...Array(7)].map((_, i) => { const d = new Date(s); d.setDate(s.getDate() + i); return keyOf(d); });
+  const today = todayKey();
+  return wk.filter(x => x > k && x >= today);
+}
 
 /* ---------- Estado de la UI ---------- */
 let view = 'home', weekOff = 0, sel = todayKey(), tab = null, sheetOpen = false;
@@ -359,9 +381,11 @@ function homeHTML() {
   const motto = total === 0 ? 'Cada sesión suma. Arrancá hoy 💪'
     : total >= goalSum ? '¡Semana cumplida! Tu espalda te lo agradece 🎉'
     : total >= goalSum / 2 ? 'Más de la mitad hecha. ¡Seguí así!' : 'Buen comienzo, mantené el ritmo.';
+  const pend = keys.filter(k => dayStatus(k) === 'missed' && !db.logs[k].missed.to);
+  const warn = !pend.length ? '' : `<span class="warn">${pend.length === 1 ? `El ${dayName(pend[0])} quedó sin cumplir` : `${pend.length} días quedaron sin cumplir`}: reorganizalo en la semana.</span>`;
 
   const st = today === sel ? dayStatus(today) : null;
-  const ctaLabel = st === 'done' ? 'Hoy: objetivo cumplido ✓' : st === 'partial' ? 'Continuar entrenamiento de hoy' : 'Comenzar entrenamiento de hoy';
+  const ctaLabel = st === 'done' ? 'Hoy: objetivo cumplido ✓' : st === 'missed' ? 'Registrar igual lo de hoy' : st === 'partial' ? 'Continuar entrenamiento de hoy' : 'Comenzar entrenamiento de hoy';
 
   return `
   <header class="top">
@@ -374,7 +398,7 @@ function homeHTML() {
     <button class="icon-btn" data-a="week" data-d="1" aria-label="Semana siguiente">${ic('chevR')}</button>
   </div>
   <div class="strip">${strip}</div>
-  <section class="card"><div class="goals">${goals}</div><p class="motto">${motto}</p></section>
+  <section class="card"><div class="goals">${goals}</div><p class="motto">${motto}${warn}</p></section>
   ${dayCardHTML(sel)}
   <div class="cta"><button class="btn primary" data-a="startToday">${ic(st === 'done' ? 'check' : 'play', 22)} ${ctaLabel}</button></div>`;
 }
@@ -387,6 +411,7 @@ function dayCardHTML(k) {
     let sub = B.sub;
     if (b === 'cardio' && l && (l.hiit || l.amrap)) sub = l.opt === 'B' ? `AMRAP · ${l.amrap} vueltas` : `HIIT · ${l.hiit} vueltas`;
     if (b === 'lumbar' && p > 0 && p < 1) sub = `${Math.round(p * 9)}/9 series`;
+    if (l && l.from && l.from[b] && p === 0) sub = `Recupera lo del ${dayName(l.from[b])}`;
     return `<div class="blk"><span class="bi" style="background:${B.bg};color:${B.color}">${ic(B.icon)}</span>
       <div><div class="bn">${B.name}</div><div class="bs">${sub}</div></div>
       <span class="chk ${p >= 1 ? 'on' : ''}">${p >= 1 ? ic('check', 16, 3) : ''}</span></div>`;
@@ -395,9 +420,32 @@ function dayCardHTML(k) {
     <div class="dayhead"><div><p class="eyebrow">${DAYS_LONG[wd(k)]} ${d.getDate()} de ${MONTHS_LONG[d.getMonth()]}</p><h2>${title}</h2></div>
       <span class="pill ${st}">${STATUS_LABEL[st]}</span></div>
     ${rows}
+    ${missHTML(k)}
     ${includeChips(k)}
     ${k !== todayKey() ? `<button class="btn sm" style="margin-top:14px" data-a="openDay">Abrir y registrar este día</button>` : ''}
   </section>`;
+}
+
+function missHTML(k) {
+  const bs = blocksFor(k), st = dayStatus(k), m = db.logs[k] && db.logs[k].missed;
+  if (!m) return bs.length && st !== 'done' && k <= todayKey()
+    ? `<button class="btn sm ghost-bad" style="margin-top:14px" data-a="miss">${ic('x', 18)} Marcar como no cumplido</button>` : '';
+  let move;
+  if (m.to) move = `<p class="moved">${ic('arrow', 16)}<span>Pasado al <b>${dayName(m.to)}</b>: ${m.blocks.map(b => BLOCKS[b].short).join(' + ')}</span></p>
+    <div class="chips"><button class="chip" data-a="unmove">Deshacer el cambio</button></div>`;
+  else {
+    const ts = moveTargets(k);
+    move = ts.length ? `<p class="sub-lbl">Pasar estos ejercicios a:</p><div class="chips">${ts.map(t => {
+        const add = bs.some(b => !blocksFor(t).includes(b));
+        return `<button class="chip" data-a="moveTo" data-t="${t}" ${add ? '' : 'disabled'}>${DAYS[wd(t)]} ${parseKey(t).getDate()}</button>`;
+      }).join('')}</div>`
+      : `<p class="sub-lbl">No quedan días en esta semana para reorganizarlo.</p>`;
+  }
+  return `<div class="miss"><h3>${ic('rain', 18)} No se pudo cumplir</h3>
+    <input id="miss-reason" maxlength="80" placeholder="Motivo (opcional)" value="${esc(m.reason)}">
+    <div class="chips">${MISS_REASONS.map(r => `<button class="chip ${m.reason === r ? 'on' : ''}" data-a="missReason" data-r="${r}">${r}</button>`).join('')}</div>
+    ${move}
+    <div class="chips" style="margin-top:10px"><button class="chip" data-a="unmiss">${ic('reset', 16)} Quitar marca</button></div></div>`;
 }
 
 function includeChips(k) {
@@ -723,6 +771,33 @@ const actions = {
       l.blocks = ORDER.filter(b => b === d.b ? !cur.includes(b) : cur.includes(b));
     });
   },
+  miss() { mutate(l => { l.missed = { reason:'', to:null, blocks:[] }; }); toast('Día marcado como no cumplido'); },
+  missReason(d) { mutate(l => { l.missed.reason = l.missed.reason === d.r ? '' : d.r; }); },
+  unmiss() {
+    if (db.logs[sel].missed.to) actions.unmove();
+    mutate(l => { delete l.missed; });
+  },
+  moveTo(d) {
+    const src = sel, t = d.t, bs = blocksFor(src).filter(b => !blocksFor(t).includes(b));
+    if (!bs.length) return;
+    mutate(l => {
+      const cur = blocksFor(t);
+      l.blocks = ORDER.filter(b => cur.includes(b) || bs.includes(b));
+      l.from = l.from || {};
+      bs.forEach(b => { l.from[b] = src; });
+    }, t);
+    mutate(l => { l.missed.to = t; l.missed.blocks = bs; }, src);
+    toast(`Pasado al ${dayName(t)} ✓`);
+  },
+  unmove() {
+    const src = sel, m = db.logs[src].missed, t = m.to;
+    if (t && db.logs[t]) mutate(l => {
+      const back = m.blocks.filter(b => l.from && l.from[b] === src);
+      l.blocks = blocksFor(t).filter(b => !back.includes(b));
+      back.forEach(b => { delete l.from[b]; });
+    }, t);
+    mutate(l => { l.missed.to = null; l.missed.blocks = []; }, src);
+  },
   tog(d) { unlockAudio(); mutate(l => { l[d.f] = !l[d.f]; }); vibe(30); },
   opt(d) { if (timerActive()) return; mutate(l => { l.opt = d.o; }); },
   step(d) {
@@ -772,6 +847,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'note') { getLog(sel, true).note = e.target.value; save(); }
+  if (e.target.id === 'miss-reason') { const l = getLog(sel, true); if (l.missed) { l.missed.reason = e.target.value; save(); } }
 });
 document.getElementById('imp').addEventListener('change', e => {
   const f = e.target.files[0]; if (!f) return;

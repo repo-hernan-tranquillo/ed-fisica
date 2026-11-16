@@ -10,6 +10,7 @@ App web progresiva (PWA) para seguir un plan semanal de entrenamiento con tres b
   - **HIIT** de 16–20 min (rondas, trabajo y descanso configurables) con 4 ejercicios sin salto.
   - **AMRAP** de 15 min con contador de rondas.
 - **Salud lumbar**: puente de glúteo, bird-dog y plancha en rodillas, con marcado de series, temporizador de plancha y de descanso.
+- **Días no cumplidos**: un día (hoy o pasado) se puede marcar como *no cumplido*, con un motivo opcional (lluvia, trabajo…), y pasar sus bloques a otro día de lo que queda de la semana. Se puede deshacer.
 - **Alertas**: sonido, vibración (Android) y pantalla siempre encendida mientras corre un temporizador.
 - **Ajustes**: plan semanal por día, alertas, exportar/importar los datos en JSON y borrar registros.
 
